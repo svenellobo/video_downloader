@@ -5,3 +5,7 @@ from pathlib import Path
 class DownloadOptions:
     url: str
     saving_folder: Path
+    audio_only: bool = False
+    audio_format: str = "bestaudio"
+    video_format: str = "bestvideo"
+    
