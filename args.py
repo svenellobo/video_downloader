@@ -1,4 +1,7 @@
+from pathlib import Path
 from options import DownloadOptions
+
+
 class DownloadArgs:  
 
     def create_arg_list(self, options: DownloadOptions) -> list[str]:
@@ -11,7 +14,7 @@ class DownloadArgs:
         if not options.saving_folder:
             raise ValueError("No destination folder provided")
         
-        output_path = options.saving_folder / "%(title)s.%(ext)s"
+        output_path: Path = options.saving_folder / "%(title)s.%(ext)s"
         args_list.extend(("uv", "run", "yt-dlp"))
         
         
@@ -20,6 +23,7 @@ class DownloadArgs:
 
 
         args_list.extend(("-o", str(output_path)))
+        args_list.append(options.url)
 
         return args_list
         

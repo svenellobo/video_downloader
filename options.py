@@ -4,8 +4,8 @@ from pathlib import Path
 
 @dataclass
 class DownloadOptions:
-    url: str
-    saving_folder: Path 
+    url: str | None = None
+    saving_folder: Path | None = None
     audio_only: bool = False
     audio_format: str = "bestaudio"
     video_format: str = "bestvideo"
