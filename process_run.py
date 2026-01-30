@@ -16,6 +16,7 @@ class DownloadProcess:
         print(f"!!!!!!!!!!!!!!!!!!!!!!!!!{arg_list}")        
         self.p = subprocess.Popen(arg_list, text=True, bufsize=1,stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         self.process_reference = self.p
+        return self.process_reference
 
         
 

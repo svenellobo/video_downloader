@@ -5,6 +5,7 @@ from output_parser import OutputParser
 from tkinter import filedialog
 from pathlib import Path
 from tkinter import messagebox
+import threading
 
 class MainInterface(ctk.CTkFrame):
     def __init__(self, parent):
@@ -20,15 +21,15 @@ class MainInterface(ctk.CTkFrame):
         self.init_screen()
 
     def init_screen(self):
-        main_frame = ctk.CTkFrame(self, fg_color="#2B2B2B", width=800,height=600)
+        main_frame = ctk.CTkFrame(self, fg_color="#ffffff", width=800,height=600)
         main_frame.grid(row=0, column=0, padx=5, pady=5)
         main_frame.grid_propagate(False)
 
         self.url_enter = ctk.CTkEntry(main_frame, placeholder_text="Enter url here")
         self.url_enter.grid(row=0, column=0, padx=5, pady=5, columnspan=2)
 
-        download_btn = ctk.CTkButton(main_frame, text="Download", command=self.video_download)
-        download_btn.grid(row=1, column=0, padx=5, pady=5)
+        self.download_btn = ctk.CTkButton(main_frame, text="Download", command=self.start_download)
+        self.download_btn.grid(row=1, column=0, padx=5, pady=5)
 
         self.choose_folder_btn = ctk.CTkButton(main_frame, text="Choose Folder", command=self.choose_folder)
         self.choose_folder_btn.grid(row=2, column=0, padx=5, pady=5)
@@ -69,24 +70,73 @@ class MainInterface(ctk.CTkFrame):
         self.analysis_size_lbl.grid(row=4, column=0, padx=5, pady=5)
 
 
-    def video_download(self):
-        options: DownloadOptions = self.create_options()
-        if options:
+    def start_download(self):
+        options = self.create_options()
+        if not options:
+            return
+        self.url_enter.delete(0, "end")
+        self.download_btn.configure(state="disabled")
+        threading.Thread(target=self.download_running, args=(options,), daemon=True).start()
+
+
+    def download_running(self, options: DownloadOptions):
+        try:   
             download_process = DownloadProcess(options)
             self.download_process_reference = download_process
-            download_process.start()
-            self.url_enter.delete(0, "end")
+            download_process.start()            
+
+            for line in download_process.process_reference.stdout:
+                line: str = line.strip()
+                print(line, flush=True)
+                self.after(0, lambda l=line: self.progress_display.configure(text=l))
+
+            rc= download_process.process_reference.wait()
+            self.after(0, lambda: self.progress_display.configure(text="Download finished" if rc == 0 else f"Download failed (rc={rc})"))
+            self.after(0, lambda: self.download_btn.configure(state="normal"))
+
+        except Exception as e:
+            self.after(0, lambda: self.download_btn.configure(state="normal"))
+            self.after(0, lambda: self.progress_display.configure(text=f"Download failed: {str(e)}"))
 
     def analyze_btn_press(self):
         url = self.url_enter.get().strip()
-        #analyze_process = DownloadProcess()
-        data = DownloadProcess.analyze(url)
-        analysis_data = OutputParser.parse(data)
+        if not url:
+            messagebox.showwarning(title="Url field is empty", message="Please enter the url")
+            return
+        
+        self.analyze_btn.configure(state="disabled")
+        self.analysis_title_lbl.configure(text="Analyzing...")
 
-        self.analysis_title_lbl.configure(text=self.title_format(analysis_data["title"]))
-        self.analysis_duration_lbl.configure(text=self.duration_format(analysis_data["duration"]))
-        #self.analysis_thumbnail_lbl.configure(text=analysis_data["title"])
-        self.analysis_size_lbl.configure(text=self.size_format(analysis_data["filesize_approx"]))
+        threading.Thread(target=self.analyze_process, args=(url,), daemon=True).start()
+
+    def analyze_process(self, url: str):
+
+        try:
+            data = DownloadProcess.analyze(url)
+            analysis_data = OutputParser.parse(data)
+
+            title = self.title_format(analysis_data.get("title")) or "N/A"
+            duration = self.duration_format(analysis_data.get("duration"))
+            size = self.size_format(analysis_data.get("filesize_approx"))
+            #self.analysis_thumbnail_lbl.configure(text=analysis_data.get("thumbnail"))
+
+            self.after(0, lambda:self.update_analysis_info(title, duration, size))
+
+        except Exception as e:
+            self.after(0, lambda: self.show_analyze_error(str(e)))
+        
+        
+
+    def update_analysis_info(self, title: str, duration: str, size: str):
+        self.analysis_title_lbl.configure(text=title)
+        self.analysis_duration_lbl.configure(text=duration)
+        self.analysis_size_lbl.configure(text=size)
+        self.analyze_btn.configure(state="normal")
+
+    def show_analyze_error(self, msg: str):
+        self.analyze_btn.configure(state="normal")
+        messagebox.showerror(title="Something went wrong", message=msg)
+            
             
 
     def create_options(self) -> DownloadOptions | None:
@@ -122,6 +172,7 @@ class MainInterface(ctk.CTkFrame):
         title = str(title)
         if len(title) > 50:
             return f"{title[:50]}..."
+        return title
 
 
     def duration_format(self, seconds: int | None) -> str:
