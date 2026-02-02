@@ -6,6 +6,9 @@ from tkinter import filedialog
 from pathlib import Path
 from tkinter import messagebox
 import threading
+import urllib.request
+import io
+from PIL import Image
 
 class MainInterface(ctk.CTkFrame):
     def __init__(self, parent):
@@ -43,6 +46,7 @@ class MainInterface(ctk.CTkFrame):
         self.folder_label.grid(row=5, column=0, padx=5, pady=5)
 
         self.progress_bar = ctk.CTkProgressBar(main_frame)
+        self.progress_bar.set(0)
         self.progress_bar.grid(row=6, column=1, padx=5, pady=5)
 
         self.progress_display = ctk.CTkLabel(main_frame, text="")
@@ -65,6 +69,7 @@ class MainInterface(ctk.CTkFrame):
 
         self.analysis_thumbnail_lbl = ctk.CTkLabel(analysis_display_frame, text="")
         self.analysis_thumbnail_lbl.grid(row=0, column=0, padx=5, pady=5)
+        self.thumbnail_reference = None
 
         self.analysis_size_lbl = ctk.CTkLabel(analysis_display_frame, text="")
         self.analysis_size_lbl.grid(row=4, column=0, padx=5, pady=5)
@@ -85,18 +90,39 @@ class MainInterface(ctk.CTkFrame):
             self.download_process_reference = download_process
             download_process.start()            
 
-            for line in download_process.process_reference.stdout:
+            dp= download_process.process_reference
+            if not dp or not dp.stdout:
+                raise RuntimeError("Download process failed to start")
+
+
+            last_error = ""
+            for line in dp.stdout:
                 line: str = line.strip()
                 print(line, flush=True)
+
+                if line.startswith("ERROR:"):
+                    last_error = line
                 self.after(0, lambda l=line: self.progress_display.configure(text=l))
 
-            rc= download_process.process_reference.wait()
-            self.after(0, lambda: self.progress_display.configure(text="Download finished" if rc == 0 else f"Download failed (rc={rc})"))
-            self.after(0, lambda: self.download_btn.configure(state="normal"))
+            rc= dp.wait()
 
+            if rc != 0:
+                msg = f"Download failed (rc={rc})"
+                if last_error:
+                    msg += f"; {last_error}"
+                
+                self.after(0, lambda m=msg: self.progress_display.configure(text=m))
+                
+            else:
+                self.after(0, lambda: self.progress_display.configure(text="Download finished"))
+                
+            
         except Exception as e:
             self.after(0, lambda: self.download_btn.configure(state="normal"))
             self.after(0, lambda: self.progress_display.configure(text=f"Download failed: {str(e)}"))
+
+        finally:
+            self.after(0, lambda: self.download_btn.configure(state="normal"))
 
     def analyze_btn_press(self):
         url = self.url_enter.get().strip()
@@ -114,24 +140,41 @@ class MainInterface(ctk.CTkFrame):
         try:
             data = DownloadProcess.analyze(url)
             analysis_data = OutputParser.parse(data)
+                     
 
             title = self.title_format(analysis_data.get("title")) or "N/A"
             duration = self.duration_format(analysis_data.get("duration"))
             size = self.size_format(analysis_data.get("filesize_approx"))
-            #self.analysis_thumbnail_lbl.configure(text=analysis_data.get("thumbnail"))
+            thumb_url = analysis_data.get("thumbnail")            
 
-            self.after(0, lambda:self.update_analysis_info(title, duration, size))
+            
+
+            thumb_img = None 
+            if thumb_url:
+                try:
+                    thumb_img = self.thumbnail_url_to_ctkimage(thumb_url)
+                except:
+                    thumb_img = None
+            
+            self.after(0, lambda:self.update_analysis_info(title, duration, size, thumb_img))
 
         except Exception as e:
             self.after(0, lambda: self.show_analyze_error(str(e)))
         
         
 
-    def update_analysis_info(self, title: str, duration: str, size: str):
+    def update_analysis_info(self, title: str, duration: str, size: str, thumb_img: ctk.CTkImage):
         self.analysis_title_lbl.configure(text=title)
         self.analysis_duration_lbl.configure(text=duration)
         self.analysis_size_lbl.configure(text=size)
         self.analyze_btn.configure(state="normal")
+        
+        if thumb_img:
+            self.thumb_img_ref = thumb_img
+            self.analysis_thumbnail_lbl.configure(image=thumb_img, text="")
+        else:
+            self.thumb_img_ref = None
+            self.analysis_thumbnail_lbl.configure(image=None, text="No thumbnail")
 
     def show_analyze_error(self, msg: str):
         self.analyze_btn.configure(state="normal")
@@ -209,7 +252,14 @@ class MainInterface(ctk.CTkFrame):
             return f"{int(file_size)} {units[i]}"
         return f"{file_size:.1f} {units[i]}"
 
+    def thumbnail_url_to_ctkimage(self, url: str) -> ctk.CTkImage:
+        with urllib.request.urlopen(url) as resp:
+            raw = resp.read()
 
+        img = Image.open(io.BytesIO(raw)).convert("RGBA")
+        img.thumbnail((220,124))
+
+        return ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
     
 
 
