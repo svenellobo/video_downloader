@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.exe
+
+# PyInstaller build artifacts
+build/
+dist/
+__pycache__/
+*.spec
+
+# PyInstaller temp files
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# macOS/Linux/Windows temp files (optional cleanup)
+.DS_Store
+*.swp
+Thumbs.db
+
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+*.db
+.ruff_cache/

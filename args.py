@@ -20,8 +20,10 @@ class DownloadArgs:
         
         
         if options.audio_only:
-            args_list.append("-x")
-            #args_list.extend(("--audio-format", "mp3"))
+            args_list.extend("-f", "bestaudio")            
+
+        else:
+            args_list.extend(("-f", "bv*+ba/b"))
 
 
         args_list.extend(("-o", str(output_path)))

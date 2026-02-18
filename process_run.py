@@ -2,7 +2,6 @@ from args import DownloadArgs
 from options import DownloadOptions
 import subprocess
 import json
-import threading
 
 
 class DownloadProcess:
@@ -12,8 +11,7 @@ class DownloadProcess:
 
     def start(self):
         dl_args = DownloadArgs()
-        arg_list = dl_args.create_arg_list(self.options)
-        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!{arg_list}")        
+        arg_list = dl_args.create_arg_list(self.options)                
         self.p = subprocess.Popen(arg_list, text=True, bufsize=1,stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         self.process_reference = self.p
         return self.process_reference
@@ -40,3 +38,9 @@ class DownloadProcess:
 
         return data
         
+    def cancel_download(self):        
+        if self.process_reference:
+            self.process_reference.terminate()
+            self.process_reference.wait()
+            self.process_reference.stdout.close()
+            self.process_reference = None
