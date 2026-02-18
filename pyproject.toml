@@ -1,7 +1,7 @@
 [project]
 name = "video-downloader"
 version = "0.1.0"
-description = "Add your description here"
+description = "Simple video downloader GUI using yt-dlp, built to practice threading and subprocess"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
